@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { api, apiUrl } from "@/lib/api";
+import { apiUpload, apiUrl } from "@/lib/api";
 import type { BulkUploadResponse } from "@/lib/types";
 
 export default function BulkUploadPage() {
@@ -70,8 +70,4 @@ export default function BulkUploadPage() {
       )}
     </div>
   );
-}
-
-async function apiUpload<T>(path: string, form: FormData): Promise<T> {
-  return (await import("@/lib/api")).apiUpload(path, form);
 }
