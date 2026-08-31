@@ -11,7 +11,7 @@ const NAV = [
   { href: "/ngo/volunteers", label: "Volunteers", icon: Users, exact: true },
   { href: "/ngo/volunteers/new", label: "Add volunteer", icon: UserPlus },
   { href: "/ngo/volunteers/bulk", label: "Bulk upload", icon: UploadCloud },
-  { href: "/ngo/events", label: "Events", icon: Megaphone },
+  { href: "/ngo/events", label: "Events", icon: Megaphone, exact: true },
   { href: "/ngo/events/new", label: "Create event", icon: Plus },
   { href: "/ngo/profile", label: "Profile", icon: Building2 },
 ];
