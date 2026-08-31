@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Provides a Jackson 2 {@link ObjectMapper} bean for services that need it
- * (e.g. BulkUploadService for serializing error reports).
+ * (e.g. report serialization helpers).
  *
  * Spring Boot 4.1's default Jackson auto-configuration exposes
  * {@code tools.jackson.databind.json.JsonMapper} (Jackson 3), not the
