@@ -7,13 +7,13 @@ import { AppShell } from "@/components/ui/sidebar";
 import { ToastHost } from "@/components/ui/toast";
 
 const NAV = [
-  { href: "/ngo/dashboard",       label: "Dashboard",     icon: LayoutDashboard, exact: true },
-  { href: "/ngo/volunteers",      label: "Volunteers",    icon: Users },
-  { href: "/ngo/volunteers/new",  label: "Add volunteer", icon: UserPlus },
-  { href: "/ngo/volunteers/bulk", label: "Bulk upload",   icon: UploadCloud },
-  { href: "/ngo/events",          label: "Events",        icon: Megaphone },
-  { href: "/ngo/events/new",      label: "Create event",  icon: Plus },
-  { href: "/ngo/profile",         label: "Profile",       icon: Building2 },
+  { href: "/ngo/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/ngo/volunteers", label: "Volunteers", icon: Users, exact: true },
+  { href: "/ngo/volunteers/new", label: "Add volunteer", icon: UserPlus },
+  { href: "/ngo/volunteers/bulk", label: "Bulk upload", icon: UploadCloud },
+  { href: "/ngo/events", label: "Events", icon: Megaphone },
+  { href: "/ngo/events/new", label: "Create event", icon: Plus },
+  { href: "/ngo/profile", label: "Profile", icon: Building2 },
 ];
 
 export default function NgoLayout({ children }: { children: React.ReactNode }) {
