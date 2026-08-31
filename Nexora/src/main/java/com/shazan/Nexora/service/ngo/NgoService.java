@@ -39,6 +39,7 @@ public class NgoService {
     private final DistrictRepository districtRepository;
     private final ThanaRepository thanaRepository;
     private final EmailService email;
+    private final BulkVolunteerService bulkVolunteerService;
 
     public Ngo currentNgo() {
         Long id = CurrentUser.ngoIdOrThrow();
@@ -86,14 +87,29 @@ public class NgoService {
         // default division = NGO's division if no filter provided
         Long div = divisionId != null ? divisionId : (ngo.getDivision() != null ? ngo.getDivision().getId() : null);
         var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Volunteer> p = volunteerRepository.search(div, districtId, thanaId, q, pageable);
+        boolean hasText = q != null && !q.isBlank();
+        // NGOs can only invite ACTIVE volunteers — pending-verification
+        // accounts are not visible until the super admin approves them.
+        Page<Volunteer> p = hasText
+                ? volunteerRepository.searchByText(div, districtId, thanaId, com.shazan.Nexora.domain.enums.VolunteerStatus.ACTIVE, q.trim(), pageable)
+                : volunteerRepository.search(div, districtId, thanaId, com.shazan.Nexora.domain.enums.VolunteerStatus.ACTIVE, pageable);
         return PageResponse.from(p.map(this::toVolunteerResponse));
     }
 
     @Transactional
     public VolunteerResponse addVolunteer(AddVolunteerRequest req) {
-        Ngo ngo = currentNgo();
-        // idempotent: if email exists, just return existing record
+        return addVolunteerInternal(currentNgo(), req);
+    }
+
+    /**
+     * Insert a single volunteer on behalf of an NGO. Shared between the
+     * single-add endpoint and the bulk CSV importer.
+     *
+     * Idempotent on email: if the address already exists, returns the
+     * existing record without re-sending the welcome email.
+     */
+    @Transactional
+    public VolunteerResponse addVolunteerInternal(Ngo ngo, AddVolunteerRequest req) {
         var existing = volunteerRepository.findByEmail(req.email());
         if (existing.isPresent()) {
             return toVolunteerResponse(existing.get());
@@ -121,6 +137,28 @@ public class NgoService {
         return toVolunteerResponse(v);
     }
 
+    /**
+     * Bulk CSV import: parse, validate, and insert up to 5,000 rows.
+     * Delegates the per-row work to {@link BulkVolunteerService}.
+     */
+    @Transactional
+    public com.shazan.Nexora.dto.volunteer.BulkUploadResponse bulkUploadVolunteers(
+            org.springframework.web.multipart.MultipartFile file) {
+        Ngo ngo = currentNgo();
+        return bulkVolunteerService.processUpload(file, ngo);
+    }
+
+    /**
+     * Build a CSV template that NGOs can download, edit, and upload back.
+     * The file includes human-readable instructions as `#` comment lines
+     * at the top, then the real header row and one sample row referencing
+     * real seeded locations (Dhaka → Dhaka → Mirpur).
+     */
+    @Transactional(readOnly = true)
+    public byte[] bulkUploadTemplate() {
+        return bulkVolunteerService.buildTemplate();
+    }
+
     private NgoResponse toResponse(Ngo ngo) {
         return new NgoResponse(
                 ngo.getId(), ngo.getName(), ngo.getEmail(), ngo.getRegistrationNo(),
@@ -133,13 +171,17 @@ public class NgoService {
     }
 
     private VolunteerResponse toVolunteerResponse(Volunteer v) {
+        // Detach the Hibernate-backed ElementCollection so Jackson can
+        // serialize it after the session is closed. .size() forces load,
+        // then List.copyOf() returns a plain immutable list.
+        List<String> safeSkills = v.getSkills() == null ? List.of() : List.copyOf(v.getSkills());
         return new VolunteerResponse(
                 v.getId(), v.getName(), v.getEmail(), v.getPhone(), v.getNid(),
                 v.getDateOfBirth(), v.getGender(),
                 v.getDivision() == null ? null : new LocationDto(v.getDivision().getId(), v.getDivision().getName(), v.getDivision().getBnName(), null),
                 v.getDistrict() == null ? null : new LocationDto(v.getDistrict().getId(), v.getDistrict().getName(), v.getDistrict().getBnName(), v.getDistrict().getDivision().getId()),
                 v.getThana() == null ? null : new LocationDto(v.getThana().getId(), v.getThana().getName(), v.getThana().getBnName(), v.getThana().getDistrict().getId()),
-                v.getSkills(), v.getStatus()
+                safeSkills, v.getStatus()
         );
     }
 

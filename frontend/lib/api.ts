@@ -1,12 +1,24 @@
+import { useAuth } from "./auth";
+
 export type ApiSuccess<T> = { success: true; data: T };
 export type ApiError = { success: false; error: { code: string; message: string } | Record<string, string> };
 export type ApiResponse<T> = ApiSuccess<T> | ApiError;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
+function getAccessToken(): string | null {
+  // Read from the zustand store directly. The store persists under
+  // "nexora-auth" and also keeps an in-memory copy that's hot-reload safe.
+  if (typeof window === "undefined") return null;
+  try {
+    return useAuth.getState().accessToken;
+  } catch {
+    return null;
+  }
+}
+
 function getAuthHeaders(): HeadersInit {
-  if (typeof window === "undefined") return {};
-  const t = localStorage.getItem("nexora.accessToken");
+  const t = getAccessToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 

@@ -46,3 +46,6 @@ frontend/dist/
 # Secrets
 .env
 .env.local
+
+# Decision capture buffers (raw session scratch; keep the cleaned entries)
+.decision/.buffers/

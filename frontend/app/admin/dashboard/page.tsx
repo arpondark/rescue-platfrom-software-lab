@@ -1,28 +1,149 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowRight, ShieldCheck, Users, Megaphone, MapPin, Activity, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
+import { StatCard, PageHeader, ErrorState } from "@/components/ui/page";
+
+type Stats = {
+  ngosPending: number;
+  ngosApproved: number;
+  ngosRejected: number;
+  volunteersTotal: number;
+  volunteersPending: number;
+  volunteersActive: number;
+  eventsActive: number;
+};
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<Record<string, number> | null>(null);
-  useEffect(() => { api<Record<string, number>>("/api/v1/admin/stats").then(setStats).catch(() => {}); }, []);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!stats) return <p>Loading...</p>;
-  const items: { label: string; value: number; color: string }[] = [
-    { label: "NGOs Pending", value: stats.ngosPending ?? 0, color: "bg-amber-100 text-amber-800" },
-    { label: "NGOs Approved", value: stats.ngosApproved ?? 0, color: "bg-green-100 text-green-800" },
-    { label: "NGOs Rejected", value: stats.ngosRejected ?? 0, color: "bg-red-100 text-red-800" },
-    { label: "Total Volunteers", value: stats.volunteersTotal ?? 0, color: "bg-sky-100 text-sky-800" },
-    { label: "Active Events", value: stats.eventsActive ?? 0, color: "bg-violet-100 text-violet-800" },
-  ];
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api<Record<string, number>>("/api/v1/admin/stats");
+      setStats({
+        ngosPending: data.ngosPending ?? 0,
+        ngosApproved: data.ngosApproved ?? 0,
+        ngosRejected: data.ngosRejected ?? 0,
+        volunteersTotal: data.volunteersTotal ?? 0,
+        volunteersPending: data.volunteersPending ?? 0,
+        volunteersActive: data.volunteersActive ?? 0,
+        eventsActive: data.eventsActive ?? 0,
+      });
+    } catch (ex: any) {
+      setError(ex?.message || "Could not load platform stats");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
 
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-      {items.map((it) => (
-        <div key={it.label} className="card">
-          <p className="text-sm text-slate-600 dark:text-slate-400">{it.label}</p>
-          <p className={`mt-2 text-3xl font-bold ${it.color}`}>{it.value}</p>
+    <div className="space-y-10">
+      <PageHeader
+        eyebrow="SUPER ADMIN COMMAND CENTER"
+        title="Platform telemetry & national overview."
+        description="Real-time disaster coordination, volunteer registrations, and NGO approval status."
+        actions={
+          <button
+            onClick={load}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-md border border-slate-800 bg-slate-900/60 px-3 py-2 font-mono text-[11px] uppercase tracking-wider text-slate-300 transition hover:border-red-500/40 hover:text-white disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-red-400" : ""}`} />
+            {loading ? "Refreshing" : "Refresh"}
+          </button>
+        }
+      />
+
+      {error && (
+        <ErrorState
+          title="Could not load stats"
+          description={error}
+          action={
+            <button
+              onClick={load}
+              className="rounded-md border border-red-500/40 bg-red-950/40 px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-red-300 hover:bg-red-900/60"
+            >
+              Try again
+            </button>
+          }
+        />
+      )}
+
+      {loading && !stats && !error && (
+        <div className="flex items-center justify-center py-16 text-slate-400 gap-3 font-mono text-sm">
+          <Activity className="h-5 w-5 text-red-500 animate-spin" />
+          <span>Loading command center telemetry…</span>
         </div>
-      ))}
+      )}
+
+      {stats && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+            <StatCard label="NGOs Pending" value={stats.ngosPending} hint="Requires review" />
+            <StatCard label="NGOs Approved" value={stats.ngosApproved} hint="Active partners" />
+            <StatCard label="NGOs Rejected" value={stats.ngosRejected} hint="Declined applications" />
+            <StatCard label="Volunteers Pending" value={stats.volunteersPending} hint="Awaiting approval" />
+            <StatCard label="Volunteers Active" value={stats.volunteersActive} hint={`of ${stats.volunteersTotal} total`} />
+            <StatCard label="Active Events" value={stats.eventsActive} hint="Live disaster dispatches" />
+          </div>
+
+          <div className="space-y-4">
+            <h2 className="font-display text-xl font-bold text-white tracking-tight">Administrative Controls</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <QuickAction
+                href="/admin/ngos"
+                icon={<ShieldCheck className="h-6 w-6 text-red-500" />}
+                title="Review NGO Approvals"
+                body="Inspect incoming organizational registrations, verify credentials, and grant dispatch rights."
+              />
+              <QuickAction
+                href="/admin/events"
+                icon={<Megaphone className="h-6 w-6 text-emerald-400" />}
+                title="Monitor Active Events"
+                body="Track real-time disaster event dispatches, invitation response rates, and volunteer allocations."
+              />
+              <QuickAction
+                href="/admin/volunteers"
+                icon={<Users className="h-6 w-6 text-amber-400" />}
+                title="Approve & Manage Volunteers"
+                body="Review pending volunteer applications, then filter the directory by Division, District, Thana, skill tag, or phone number."
+              />
+              <QuickAction
+                href="/admin/locations"
+                icon={<MapPin className="h-6 w-6 text-cyan-400" />}
+                title="Manage Territorial Hierarchy"
+                body="Maintain Bangladesh divisions, districts, and thanas administrative database."
+              />
+            </div>
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+function QuickAction({ href, icon, title, body }: { href: string; icon: React.ReactNode; title: string; body: string }) {
+  return (
+    <Link href={href} className="glass-card p-6 rounded-2xl flex items-start gap-5 hover:border-red-500/40 transition group">
+      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 group-hover:scale-110 transition-transform">
+        {icon}
+      </div>
+      <div className="flex-1 space-y-1">
+        <h3 className="font-display font-bold text-lg text-white flex items-center gap-2 group-hover:text-red-400 transition-colors">
+          {title}
+          <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+        </h3>
+        <p className="text-sm text-slate-400 leading-relaxed">{body}</p>
+      </div>
+    </Link>
   );
 }

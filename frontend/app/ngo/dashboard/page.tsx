@@ -1,8 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Plus, ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
-import type { DisasterEventResponse, NgoResponse, PageResp } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { EventStatusBadge, SeverityBadge, EventTypeBadge } from "@/components/ui/badge";
+import { PageHeader, StatCard, EmptyState, SectionTitle } from "@/components/ui/page";
 import { formatDateTime } from "@/lib/utils";
+import type { DisasterEventResponse, NgoResponse, PageResp } from "@/lib/types";
 
 export default function NgoDashboard() {
   const [profile, setProfile] = useState<NgoResponse | null>(null);
@@ -13,34 +18,90 @@ export default function NgoDashboard() {
     api<PageResp<DisasterEventResponse>>("/api/v1/ngo/events?page=0&size=20").then(setEvents).catch(() => {});
   }, []);
 
-  return (
-    <div className="space-y-6">
-      {profile && (
-        <div className="card">
-          <h2 className="text-lg font-semibold">{profile.name}</h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400">{profile.email} · {profile.phone}</p>
-          <p className="mt-1 text-xs">Area: {[profile.thana?.name, profile.district?.name, profile.division?.name].filter(Boolean).join(", ")}</p>
-        </div>
-      )}
+  const open = events?.content.filter((e) => e.status === "OPEN").length ?? 0;
+  const ongoing = events?.content.filter((e) => e.status === "ONGOING").length ?? 0;
+  const closed = events?.content.filter((e) => e.status === "CLOSED").length ?? 0;
+  const totalAccepted = events?.content.reduce((s, e) => s + (e.acceptedCount ?? 0), 0) ?? 0;
 
-      <div className="card">
-        <h2 className="text-lg font-semibold mb-3">Recent Events</h2>
-        <table className="table">
-          <thead><tr><th>Title</th><th>Type</th><th>Severity</th><th>Status</th><th>Start</th><th>Progress</th></tr></thead>
-          <tbody>
-            {events?.content.map((e) => (
-              <tr key={e.id}>
-                <td>{e.title}</td>
-                <td>{e.type}</td>
-                <td>{e.severity}</td>
-                <td>{e.status}</td>
-                <td className="text-xs">{formatDateTime(e.startAt)}</td>
-                <td className="text-xs">A:{e.acceptedCount} I:{e.invitedCount} D:{e.declinedCount}</td>
-              </tr>
-            ))}
-            {events?.content.length === 0 && <tr><td colSpan={6} className="text-center text-sm py-4 text-slate-500">No events yet</td></tr>}
-          </tbody>
-        </table>
+  return (
+    <div>
+      <PageHeader
+        eyebrow="NGO dashboard"
+        title={profile ? profile.name : "Your operations"}
+        description={
+          profile
+            ? `Operating in ${[profile.thana?.name, profile.district?.name, profile.division?.name].filter(Boolean).join(", ")}.`
+            : undefined
+        }
+        actions={
+          <Link href="/ngo/events/new">
+            <Button><Plus className="h-4 w-4" /> New event</Button>
+          </Link>
+        }
+      />
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Open events"     value={open}    />
+        <StatCard label="Ongoing"         value={ongoing} />
+        <StatCard label="Closed"          value={closed}  />
+        <StatCard label="Volunteers committed" value={totalAccepted} hint="Across all events" />
+      </div>
+
+      <div className="mt-10">
+        <div className="flex items-center justify-between mb-4">
+          <SectionTitle eyebrow="Recent activity" title="Your events" />
+          <Link href="/ngo/events" className="text-sm text-signal hover:underline flex items-center gap-1">
+            All events <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
+
+        {events?.content.length === 0 ? (
+          <EmptyState
+            title="No events yet."
+            description="Open your first disaster event to start inviting volunteers."
+            action={
+              <Link href="/ngo/events/new">
+                <Button>Create event</Button>
+              </Link>
+            }
+          />
+        ) : (
+          <div className="border border-ink-300 rounded bg-surface overflow-hidden">
+            <table className="nx-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Type</th>
+                  <th>Severity</th>
+                  <th>Status</th>
+                  <th>Start</th>
+                  <th>Progress</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events?.content.map((e) => (
+                  <tr key={e.id}>
+                    <td>
+                      <Link href={`/ngo/events/${e.id}`} className="font-medium text-ink hover:text-signal">
+                        {e.title}
+                      </Link>
+                    </td>
+                    <td><EventTypeBadge type={e.type} /></td>
+                    <td><SeverityBadge severity={e.severity} /></td>
+                    <td><EventStatusBadge status={e.status} /></td>
+                    <td className="text-xs font-mono text-mist">{formatDateTime(e.startAt)}</td>
+                    <td className="text-xs">
+                      <span className="font-mono">
+                        {e.acceptedCount}/{e.requiredVolunteers}
+                      </span>
+                      <span className="text-mist"> · invited {e.invitedCount} · declined {e.declinedCount}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -21,7 +21,10 @@ export interface UserPrincipal {
 }
 
 export interface AuthResponse {
-  accessToken: string; refreshToken: string; expiresInMs: number; principal: UserPrincipal;
+  accessToken: string | null;
+  refreshToken: string | null;
+  expiresInMs: number;
+  principal: UserPrincipal;
 }
 
 export interface NgoResponse {

@@ -81,6 +81,12 @@ public class Volunteer extends BaseEntity {
 
     @PrePersist
     private void prePersist() {
-        if (status == null) status = VolunteerStatus.ACTIVE;
+        if (status == null) {
+            // Volunteers added directly by an NGO start ACTIVE — they've been
+            // vetted by a trusted org. Self-registered volunteers must wait
+            // for Super Admin approval, so AuthService.registerVolunteer
+            // explicitly sets PENDING_VERIFICATION before save.
+            status = (recruitedByNgo != null) ? VolunteerStatus.ACTIVE : VolunteerStatus.PENDING_VERIFICATION;
+        }
     }
 }

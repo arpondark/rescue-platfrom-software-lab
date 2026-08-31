@@ -2,30 +2,187 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #fafafa;
-  --foreground: #0f172a;
-}
-.dark {
-  --background: #0b1220;
-  --foreground: #f8fafc;
-}
-html, body { background: var(--background); color: var(--foreground); }
-body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+/* ---------------------------------------------------------------------------
+ * Nexora Modern Emergency Coordination Palette & Utility System
+ * High Contrast, Glassmorphism, Ambient Glows, Responsive Typography
+ * ------------------------------------------------------------------------ */
 
+:root {
+  /* Dark-first palette — paper is dark slate, ink is near-white.
+   * Tailwind tokens in tailwind.config.ts mirror these values. */
+  --background: #06090F;
+  --foreground: #F8FAFC;
+  --paper: #0F172A;
+  --paper-200: #1E293B;
+  --surface: #0F172A;
+  --surface-200: #1E293B;
+  --border: #334155;
+  --muted: #94A3B8;
+  --mist: #94A3B8;
+  --ink: #F8FAFC;
+  --ink-300: #475569;
+  --ink-400: #334155;
+
+  --signal: #EF4444;
+  --signal-600: #DC2626;
+  --signal-700: #B91C1C;
+
+  --relief: #10B981;
+  --relief-600: #059669;
+
+  --amber-alert: #F59E0B;
+  --cyan-intel: #06B6D4;
+}
+
+html, body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+* {
+  border-color: var(--border);
+}
+
+/* Headings with high impact display font */
+.font-display {
+  font-family: var(--font-display), "Outfit", "Segoe UI", sans-serif;
+  letter-spacing: -0.025em;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display), "Outfit", "Segoe UI", sans-serif;
+  letter-spacing: -0.025em;
+}
+
+.font-mono {
+  font-family: var(--font-mono), "JetBrains Mono", monospace;
+}
+
+/* Eyebrow badge style */
+.eyebrow {
+  font-family: var(--font-mono), monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.725rem;
+  font-weight: 600;
+  color: #EF4444;
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Glassmorphism primitives */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(239, 68, 68, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 35px -10px rgba(239, 68, 68, 0.15);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0B0F17;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Modern component classes */
 @layer components {
-  .btn { @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed; }
-  .btn-primary { @apply btn bg-brand-500 text-white hover:bg-brand-600; }
-  .btn-secondary { @apply btn border border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800; }
-  .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
-  .input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-900; }
-  .label { @apply block text-sm font-medium mb-1; }
-  .card { @apply rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900; }
-  .table { @apply w-full text-left text-sm; }
-  .table th { @apply border-b border-slate-200 px-3 py-2 font-medium dark:border-slate-700; }
-  .table td { @apply border-b border-slate-100 px-3 py-2 dark:border-slate-800; }
-  .badge { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
-  .badge-pending { @apply badge bg-amber-100 text-amber-800; }
-  .badge-approved { @apply badge bg-green-100 text-green-800; }
-  .badge-rejected { @apply badge bg-red-100 text-red-800; }
+  .nx-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-semibold text-sm transition-all duration-200
+           disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-[0.98];
+  }
+  .nx-btn-primary {
+    @apply nx-btn bg-gradient-to-r from-red-600 to-rose-500 text-white hover:from-red-500 hover:to-rose-400 px-5 py-2.5 shadow-[0_0_24px_-4px_rgba(239,68,68,0.5)] border border-red-500/30;
+  }
+  .nx-btn-secondary {
+    @apply nx-btn bg-slate-800/80 text-slate-100 border border-slate-700/80 hover:bg-slate-700/80 hover:border-slate-600 px-5 py-2.5 backdrop-blur-sm;
+  }
+  .nx-btn-ghost {
+    @apply nx-btn text-slate-300 hover:text-white hover:bg-slate-800/50 px-4 py-2;
+  }
+  .nx-btn-danger {
+    @apply nx-btn bg-red-950/40 text-red-400 border border-red-800/50 hover:bg-red-900/60 px-4 py-2;
+  }
+  .nx-input {
+    @apply w-full rounded-lg bg-slate-900/90 border border-slate-700/80 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500
+           focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all;
+  }
+  .nx-label {
+    @apply block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5;
+  }
+  .nx-card {
+    @apply rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.6)];
+  }
+  .nx-card-flat {
+    @apply rounded-xl border border-slate-800/80 bg-slate-900/50 p-6;
+  }
+  .nx-stat {
+    @apply glass-card p-6 rounded-xl flex flex-col justify-between;
+  }
+  .nx-stat-value {
+    @apply font-display text-3xl font-bold tracking-tight text-white;
+  }
+  .nx-stat-label {
+    @apply font-mono text-[10px] uppercase tracking-[0.14em] font-semibold text-slate-400;
+  }
+  .nx-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tracking-wide border;
+  }
+  .nx-badge-signal {
+    @apply nx-badge bg-red-500/10 text-red-400 border-red-500/30;
+  }
+  .nx-badge-ink {
+    @apply nx-badge bg-slate-800 text-slate-200 border-slate-700;
+  }
+  .nx-badge-relief {
+    @apply nx-badge bg-emerald-500/10 text-emerald-400 border-emerald-500/30;
+  }
+  .nx-badge-warning {
+    @apply nx-badge bg-amber-500/10 text-amber-400 border-amber-500/30;
+  }
+  .nx-table {
+    @apply w-full text-sm text-left;
+  }
+  .nx-table th {
+    @apply border-b border-slate-800 px-4 py-3 font-mono text-xs text-slate-400 font-semibold uppercase tracking-wider bg-slate-900/40;
+  }
+  .nx-table td {
+    @apply border-b border-slate-800/50 px-4 py-3.5 text-slate-200;
+  }
+  .nx-table tr:hover td {
+    @apply bg-slate-800/40;
+  }
 }

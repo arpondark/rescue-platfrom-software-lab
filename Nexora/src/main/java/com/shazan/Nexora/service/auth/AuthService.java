@@ -71,9 +71,15 @@ public class AuthService {
                 .dateOfBirth(req.dateOfBirth()).gender(req.gender())
                 .division(division).district(district).thana(thana)
                 .skills(new java.util.ArrayList<>(skills))
+                .status(com.shazan.Nexora.domain.enums.VolunteerStatus.PENDING_VERIFICATION)
                 .build();
         volunteerRepository.save(v);
-        return tokenForVolunteer(v);
+        log.info("New volunteer registered, awaiting super-admin approval: {}", v.getEmail());
+        email.sendVolunteerPendingReview(v, "https://nexora.bd/login");
+        // Self-registered volunteers can't sign in until the super admin
+        // approves them — mirror the NGO flow and return null tokens.
+        return new AuthResponse(null, null, 0L,
+                new AuthResponse.UserPrincipal(v.getId(), v.getEmail(), v.getName(), "ROLE_VOLUNTEER", null, v.getStatus().name()));
     }
 
     @Transactional
@@ -102,8 +108,9 @@ public class AuthService {
         ngoRepository.save(ngo);
         log.info("New NGO registered, awaiting approval: {}", ngo.getEmail());
         // Inform applicant — but no JWT yet since they can't log in.
-        email.sendNgoApproval(ngo, false, "Your NGO registration is received and pending Super Admin approval.", "https://nexora.bd/login");
-        throw ApiException.conflict("PENDING_APPROVAL", "Registration received, pending Super Admin approval");
+        email.sendNgoApproval(ngo, EmailService.ApprovalOutcome.PENDING, null, "https://nexora.bd/login");
+        return new AuthResponse(null, null, 0L,
+                new AuthResponse.UserPrincipal(ngo.getId(), ngo.getEmail(), ngo.getName(), "ROLE_NGO_ADMIN", ngo.getId(), ngo.getStatus().name()));
     }
 
     public AuthResponse login(LoginRequest req) {
@@ -134,6 +141,13 @@ public class AuthService {
             if (!passwordEncoder.matches(req.password(), v.getPasswordHash())) {
                 throw ApiException.unauthorized("BAD_CREDENTIALS", "Invalid email or password");
             }
+            var vStatus = v.getStatus();
+            if (vStatus == com.shazan.Nexora.domain.enums.VolunteerStatus.PENDING_VERIFICATION) {
+                throw ApiException.forbidden("VOLUNTEER_PENDING", "Your volunteer account is awaiting Super Admin approval");
+            }
+            if (vStatus == com.shazan.Nexora.domain.enums.VolunteerStatus.INACTIVE) {
+                throw ApiException.forbidden("VOLUNTEER_INACTIVE", "Your volunteer account has been deactivated");
+            }
             return tokenForVolunteer(v);
         }
         throw ApiException.unauthorized("BAD_CREDENTIALS", "Invalid email or password");
@@ -162,8 +176,14 @@ public class AuthService {
                 }
                 yield tokenForNgo(ngo);
             }
-            case "ROLE_VOLUNTEER" -> tokenForVolunteer(volunteerRepository.findById(userId)
-                    .orElseThrow(() -> ApiException.unauthorized("USER_NOT_FOUND", "User not found")));
+            case "ROLE_VOLUNTEER" -> {
+                Volunteer v = volunteerRepository.findById(userId)
+                        .orElseThrow(() -> ApiException.unauthorized("USER_NOT_FOUND", "User not found"));
+                if (v.getStatus() != com.shazan.Nexora.domain.enums.VolunteerStatus.ACTIVE) {
+                    throw ApiException.forbidden("VOLUNTEER_NOT_ACTIVE", "Volunteer is not active");
+                }
+                yield tokenForVolunteer(v);
+            }
             default -> throw ApiException.unauthorized("UNKNOWN_ROLE", "Unknown role");
         };
     }

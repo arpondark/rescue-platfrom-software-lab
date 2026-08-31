@@ -1,17 +1,19 @@
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { LayoutDashboard, Users, UserPlus, UploadCloud, Megaphone, Plus, Building2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import DashboardShell from "@/components/DashboardShell";
+import { AppShell } from "@/components/ui/sidebar";
+import { ToastHost } from "@/components/ui/toast";
 
 const NAV = [
-  { href: "/ngo/dashboard", label: "Dashboard" },
-  { href: "/ngo/volunteers", label: "Volunteers" },
-  { href: "/ngo/volunteers/new", label: "Add Volunteer" },
-  { href: "/ngo/volunteers/bulk", label: "Bulk Upload" },
-  { href: "/ngo/events", label: "Events" },
-  { href: "/ngo/events/new", label: "Create Event" },
-  { href: "/ngo/profile", label: "Profile" },
+  { href: "/ngo/dashboard",       label: "Dashboard",     icon: LayoutDashboard, exact: true },
+  { href: "/ngo/volunteers",      label: "Volunteers",    icon: Users },
+  { href: "/ngo/volunteers/new",  label: "Add volunteer", icon: UserPlus },
+  { href: "/ngo/volunteers/bulk", label: "Bulk upload",   icon: UploadCloud },
+  { href: "/ngo/events",          label: "Events",        icon: Megaphone },
+  { href: "/ngo/events/new",      label: "Create event",  icon: Plus },
+  { href: "/ngo/profile",         label: "Profile",       icon: Building2 },
 ];
 
 export default function NgoLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +25,11 @@ export default function NgoLayout({ children }: { children: React.ReactNode }) {
     if (principal.role !== "ROLE_NGO_ADMIN") router.replace("/login");
   }, [principal, router]);
 
-  if (principal === null) return <div className="p-10 text-sm">Loading...</div>;
-  return <DashboardShell title="" nav={NAV}>{children}</DashboardShell>;
+  if (principal === null) return <div className="p-10 text-sm text-mist">Loading…</div>;
+  return (
+    <AppShell role="ROLE_NGO_ADMIN" nav={NAV}>
+      {children}
+      <ToastHost />
+    </AppShell>
+  );
 }

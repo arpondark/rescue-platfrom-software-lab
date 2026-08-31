@@ -1,15 +1,17 @@
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { LayoutDashboard, ShieldCheck, Users, Megaphone, Map } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import DashboardShell from "@/components/DashboardShell";
+import { AppShell } from "@/components/ui/sidebar";
+import { ToastHost } from "@/components/ui/toast";
 
 const NAV = [
-  { href: "/admin/dashboard", label: "Dashboard" },
-  { href: "/admin/ngos", label: "NGO Approvals" },
-  { href: "/admin/volunteers", label: "Volunteers" },
-  { href: "/admin/events", label: "All Events" },
-  { href: "/admin/locations", label: "Locations" },
+  { href: "/admin/dashboard",  label: "Dashboard",     icon: LayoutDashboard, exact: true },
+  { href: "/admin/ngos",       label: "NGO approvals", icon: ShieldCheck },
+  { href: "/admin/volunteers", label: "Volunteers",    icon: Users },
+  { href: "/admin/events",     label: "All events",    icon: Megaphone },
+  { href: "/admin/locations",  label: "Locations",     icon: Map },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -22,7 +24,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [principal, router]);
 
   if (principal === null) {
-    return <div className="p-10 text-sm">Loading...</div>;
+    return <div className="p-10 text-sm text-mist">Loading…</div>;
   }
-  return <DashboardShell title="" nav={NAV}>{children}</DashboardShell>;
+  return (
+    <AppShell role="ROLE_SUPER_ADMIN" nav={NAV}>
+      {children}
+      <ToastHost />
+    </AppShell>
+  );
 }

@@ -3,10 +3,12 @@ package com.shazan.Nexora.controller.admin;
 import com.shazan.Nexora.common.ApiResponse;
 import com.shazan.Nexora.common.PageResponse;
 import com.shazan.Nexora.domain.enums.NgoStatus;
+import com.shazan.Nexora.domain.enums.VolunteerStatus;
 import com.shazan.Nexora.dto.event.DisasterEventResponse;
 import com.shazan.Nexora.dto.location.LocationDto;
 import com.shazan.Nexora.dto.ngo.NgoApprovalRequest;
 import com.shazan.Nexora.dto.ngo.NgoResponse;
+import com.shazan.Nexora.dto.volunteer.VolunteerApprovalRequest;
 import com.shazan.Nexora.dto.volunteer.VolunteerResponse;
 import com.shazan.Nexora.service.admin.SuperAdminService;
 import jakarta.validation.Valid;
@@ -41,10 +43,17 @@ public class SuperAdminController {
             @RequestParam(required = false) Long divisionId,
             @RequestParam(required = false) Long districtId,
             @RequestParam(required = false) Long thanaId,
+            @RequestParam(required = false) VolunteerStatus status,
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok(service.listVolunteers(divisionId, districtId, thanaId, q, page, size));
+        return ApiResponse.ok(service.listVolunteers(divisionId, districtId, thanaId, status, q, page, size));
+    }
+
+    @PostMapping("/volunteers/{id}/review")
+    public ApiResponse<VolunteerResponse> reviewVolunteer(@PathVariable Long id,
+                                                          @Valid @RequestBody VolunteerApprovalRequest req) {
+        return ApiResponse.ok(service.reviewVolunteer(id, req));
     }
 
     @GetMapping("/events")

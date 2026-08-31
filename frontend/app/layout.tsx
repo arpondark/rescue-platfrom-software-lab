@@ -1,15 +1,43 @@
-import "./globals.css";
 import type { Metadata } from "next";
+import { Outfit, Inter, JetBrains_Mono } from "next/font/google";
+import "./globals.css";
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const jetbrains = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: "Nexora — Disaster Management & Volunteer Recruitment",
-  description: "Disaster Management & Volunteer Recruitment Platform for Bangladesh",
+  title: "Nexora — Disaster response coordination for Bangladesh",
+  description:
+    "A coordination layer for NGOs and volunteers. Recruit rosters, invite responders, track deployments — across the country.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en">
-      <body className="min-h-screen">{children}</body>
+    <html
+      lang="en"
+      data-theme="nexora"
+      className={`${outfit.variable} ${inter.variable} ${jetbrains.variable}`}
+    >
+      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-red-500 selection:text-white">{children}</body>
     </html>
   );
 }

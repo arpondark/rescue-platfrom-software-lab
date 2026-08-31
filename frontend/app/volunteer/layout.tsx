@@ -1,13 +1,15 @@
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { LayoutDashboard, Inbox, UserCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import DashboardShell from "@/components/DashboardShell";
+import { AppShell } from "@/components/ui/sidebar";
+import { ToastHost } from "@/components/ui/toast";
 
 const NAV = [
-  { href: "/volunteer/dashboard", label: "Dashboard" },
-  { href: "/volunteer/invitations", label: "Invitations" },
-  { href: "/volunteer/profile", label: "Profile" },
+  { href: "/volunteer/dashboard",    label: "Dashboard",    icon: LayoutDashboard, exact: true },
+  { href: "/volunteer/invitations",  label: "Invitations",  icon: Inbox },
+  { href: "/volunteer/profile",      label: "Profile",      icon: UserCircle },
 ];
 
 export default function VolunteerLayout({ children }: { children: React.ReactNode }) {
@@ -19,6 +21,11 @@ export default function VolunteerLayout({ children }: { children: React.ReactNod
     if (principal.role !== "ROLE_VOLUNTEER") router.replace("/login");
   }, [principal, router]);
 
-  if (principal === null) return <div className="p-10 text-sm">Loading...</div>;
-  return <DashboardShell title="" nav={NAV}>{children}</DashboardShell>;
+  if (principal === null) return <div className="p-10 text-sm text-mist">Loading…</div>;
+  return (
+    <AppShell role="ROLE_VOLUNTEER" nav={NAV}>
+      {children}
+      <ToastHost />
+    </AppShell>
+  );
 }

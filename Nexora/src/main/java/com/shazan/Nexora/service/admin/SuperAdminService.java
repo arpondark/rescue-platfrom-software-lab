@@ -3,6 +3,7 @@ package com.shazan.Nexora.service.admin;
 import com.shazan.Nexora.common.PageResponse;
 import com.shazan.Nexora.common.exception.ApiException;
 import com.shazan.Nexora.domain.enums.NgoStatus;
+import com.shazan.Nexora.domain.enums.VolunteerStatus;
 import com.shazan.Nexora.domain.event.DisasterEvent;
 import com.shazan.Nexora.domain.location.District;
 import com.shazan.Nexora.domain.location.Division;
@@ -13,6 +14,7 @@ import com.shazan.Nexora.dto.event.DisasterEventResponse;
 import com.shazan.Nexora.dto.location.LocationDto;
 import com.shazan.Nexora.dto.ngo.NgoApprovalRequest;
 import com.shazan.Nexora.dto.ngo.NgoResponse;
+import com.shazan.Nexora.dto.volunteer.VolunteerApprovalRequest;
 import com.shazan.Nexora.dto.volunteer.VolunteerResponse;
 import com.shazan.Nexora.email.EmailService;
 import com.shazan.Nexora.repository.event.DisasterEventRepository;
@@ -32,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -47,6 +50,7 @@ public class SuperAdminService {
     private final ThanaRepository thanaRepository;
     private final EmailService email;
 
+    @Transactional(readOnly = true)
     public PageResponse<NgoResponse> listNgos(NgoStatus status, int page, int size) {
         var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<Ngo> p = status == null ? ngoRepository.findAll(pageable) : ngoRepository.findAllByStatus(status, pageable);
@@ -77,23 +81,51 @@ public class SuperAdminService {
         return toNgoResponse(ngo);
     }
 
+    @Transactional(readOnly = true)
     public PageResponse<VolunteerResponse> listVolunteers(Long divisionId, Long districtId, Long thanaId,
-                                                          String q, int page, int size) {
+                                                          VolunteerStatus status, String q, int page, int size) {
         var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return PageResponse.from(volunteerRepository.search(divisionId, districtId, thanaId, q, pageable).map(this::toVolunteerResponse));
+        boolean hasText = q != null && !q.isBlank();
+        var source = hasText
+                ? volunteerRepository.searchByText(divisionId, districtId, thanaId, status, q.trim(), pageable)
+                : volunteerRepository.search(divisionId, districtId, thanaId, status, pageable);
+        return PageResponse.from(source.map(this::toVolunteerResponse));
     }
 
+    @Transactional
+    public VolunteerResponse reviewVolunteer(Long volunteerId, VolunteerApprovalRequest req) {
+        Volunteer v = volunteerRepository.findById(volunteerId)
+                .orElseThrow(() -> ApiException.notFound("VOLUNTEER_NOT_FOUND", "Volunteer not found"));
+        if (Boolean.TRUE.equals(req.approve())) {
+            v.setStatus(VolunteerStatus.ACTIVE);
+            volunteerRepository.save(v);
+            email.sendVolunteerApproved(v, "https://nexora.bd/login");
+        } else {
+            if (req.reason() == null || req.reason().length() < 10) {
+                throw ApiException.badRequest("REASON_REQUIRED", "Reason must be at least 10 characters");
+            }
+            v.setStatus(VolunteerStatus.INACTIVE);
+            volunteerRepository.save(v);
+            email.sendVolunteerRejected(v, req.reason());
+        }
+        return toVolunteerResponse(v);
+    }
+
+    @Transactional(readOnly = true)
     public PageResponse<DisasterEventResponse> listAllEvents(int page, int size) {
         var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return PageResponse.from(eventRepository.findAll(pageable).map(this::toEventResponse));
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> stats() {
         Map<String, Object> m = new HashMap<>();
-        m.put("ngosPending", ngoRepository.findAllByStatus(NgoStatus.PENDING).size());
-        m.put("ngosApproved", ngoRepository.findAllByStatus(NgoStatus.APPROVED).size());
-        m.put("ngosRejected", ngoRepository.findAllByStatus(NgoStatus.REJECTED).size());
+        m.put("ngosPending", ngoRepository.countByStatus(NgoStatus.PENDING));
+        m.put("ngosApproved", ngoRepository.countByStatus(NgoStatus.APPROVED));
+        m.put("ngosRejected", ngoRepository.countByStatus(NgoStatus.REJECTED));
         m.put("volunteersTotal", volunteerRepository.count());
+        m.put("volunteersPending", volunteerRepository.countByStatus(VolunteerStatus.PENDING_VERIFICATION));
+        m.put("volunteersActive", volunteerRepository.countByStatus(VolunteerStatus.ACTIVE));
         m.put("eventsActive", eventRepository.countByStatus(com.shazan.Nexora.domain.enums.EventStatus.OPEN)
                 + eventRepository.countByStatus(com.shazan.Nexora.domain.enums.EventStatus.ONGOING));
         return m;
@@ -149,22 +181,33 @@ public class SuperAdminService {
     }
 
     private VolunteerResponse toVolunteerResponse(Volunteer v) {
+        // Detach the Hibernate-backed ElementCollection so Jackson can
+        // serialize it after the session is closed. .size() forces load,
+        // then List.copyOf() returns a plain immutable list.
+        List<String> safeSkills = v.getSkills() == null ? List.of() : List.copyOf(v.getSkills());
         return new VolunteerResponse(
                 v.getId(), v.getName(), v.getEmail(), v.getPhone(), v.getNid(),
                 v.getDateOfBirth(), v.getGender(),
                 v.getDivision() == null ? null : new LocationDto(v.getDivision().getId(), v.getDivision().getName(), v.getDivision().getBnName(), null),
                 v.getDistrict() == null ? null : new LocationDto(v.getDistrict().getId(), v.getDistrict().getName(), v.getDistrict().getBnName(), v.getDistrict().getDivision().getId()),
                 v.getThana() == null ? null : new LocationDto(v.getThana().getId(), v.getThana().getName(), v.getThana().getBnName(), v.getThana().getDistrict().getId()),
-                v.getSkills(), v.getStatus()
+                safeSkills, v.getStatus()
         );
     }
 
     private DisasterEventResponse toEventResponse(DisasterEvent e) {
+        // Same defensive copy as Volunteer.skills: ElementCollections must
+        // be detached before the Hibernate session closes, otherwise
+        // Jackson will try to lazily read them at serialization time.
+        List<LocationDto> divs = e.getDivisions().stream()
+                .map(d -> new LocationDto(d.getId(), d.getName(), d.getBnName(), null)).toList();
+        List<LocationDto> dists = e.getDistricts().stream()
+                .map(d -> new LocationDto(d.getId(), d.getName(), d.getBnName(), d.getDivision().getId())).toList();
+        List<LocationDto> thns = e.getThanas().stream()
+                .map(t -> new LocationDto(t.getId(), t.getName(), t.getBnName(), t.getDistrict().getId())).toList();
         return new DisasterEventResponse(
                 e.getId(), e.getTitle(), e.getType(), e.getSeverity(), e.getDescription(),
-                e.getDivisions().stream().map(d -> new LocationDto(d.getId(), d.getName(), d.getBnName(), null)).toList(),
-                e.getDistricts().stream().map(d -> new LocationDto(d.getId(), d.getName(), d.getBnName(), d.getDivision().getId())).toList(),
-                e.getThanas().stream().map(t -> new LocationDto(t.getId(), t.getName(), t.getBnName(), t.getDistrict().getId())).toList(),
+                divs, dists, thns,
                 e.getStartAt(), e.getEndAt(), e.getRequiredVolunteers(), e.getStatus(),
                 e.getNgo().getId(), e.getNgo().getName(),
                 invitationRepository.countByEventAndStatus(e, com.shazan.Nexora.domain.enums.InvitationStatus.ACCEPTED),

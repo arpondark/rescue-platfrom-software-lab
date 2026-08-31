@@ -111,7 +111,9 @@ public class DisasterEventService {
     public List<Volunteer> recommended(Long eventId, String skill) {
         DisasterEvent event = loadEvent(eventId);
         List<Long> divisionIds = event.getDivisions().stream().map(Division::getId).toList();
-        return volunteerRepository.findRecommendedForDivisions(divisionIds, skill);
+        // Normalize to a non-null string so the JDBC driver binds as varchar.
+        String safeSkill = (skill == null || skill.isBlank()) ? "" : skill.trim();
+        return volunteerRepository.findRecommendedForDivisions(divisionIds, safeSkill);
     }
 
     @Transactional

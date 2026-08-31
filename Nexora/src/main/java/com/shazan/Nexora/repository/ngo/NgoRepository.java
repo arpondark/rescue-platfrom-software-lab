@@ -16,4 +16,5 @@ public interface NgoRepository extends JpaRepository<Ngo, Long> {
     Page<Ngo> findAllByStatus(NgoStatus status, Pageable pageable);
     Page<Ngo> findAll(Pageable pageable);
     List<Ngo> findAllByStatus(NgoStatus status);
+    long countByStatus(NgoStatus status);
 }

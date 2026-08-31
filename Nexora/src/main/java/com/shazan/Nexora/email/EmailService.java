@@ -75,16 +75,39 @@ public class EmailService {
 
     @Async("taskExecutor")
     public void sendNgoApproval(Ngo ngo, boolean approved, String reason, String loginUrl) {
-        String subject = approved ? "Your NGO has been approved!" : "Your NGO registration was rejected";
-        String body = approved
-                ? """
+        sendNgoApproval(ngo, approved ? ApprovalOutcome.APPROVED : ApprovalOutcome.REJECTED, reason, loginUrl);
+    }
+
+    @Async("taskExecutor")
+    public void sendNgoApproval(Ngo ngo, ApprovalOutcome outcome, String reason, String loginUrl) {
+        switch (outcome) {
+            case APPROVED -> {
+                String subject = "Your NGO has been approved!";
+                String body = """
                   <div style="font-family:Segoe UI,Roboto,sans-serif;max-width:560px;margin:auto">
                     <h2 style="color:#16a34a">Welcome aboard, %s!</h2>
                     <p>Your NGO has been approved by the Nexora Super Admin. You can now log in and start recruiting volunteers and creating disaster events.</p>
                     <p><a href="%s" style="background:#0ea5e9;color:white;padding:10px 16px;border-radius:8px;text-decoration:none">Login now</a></p>
                   </div>
-                  """.formatted(ngo.getName(), loginUrl)
-                : """
+                  """.formatted(ngo.getName(), loginUrl);
+                send(ngo.getEmail(), subject, body);
+            }
+            case PENDING -> {
+                String subject = "Your NGO registration is pending review";
+                String body = """
+                  <div style="font-family:Segoe UI,Roboto,sans-serif;max-width:560px;margin:auto">
+                    <h2 style="color:#0ea5e9">Registration received</h2>
+                    <p>Hi %s,</p>
+                    <p>Thank you for registering your NGO with Nexora. Your application has been received and is now awaiting Super Admin review.</p>
+                    <p>You will receive another email as soon as your account has been approved. Most reviews are completed within one business day.</p>
+                    <p>If you don't hear back within 48 hours, please reply to this email.</p>
+                  </div>
+                  """.formatted(ngo.getName());
+                send(ngo.getEmail(), subject, body);
+            }
+            case REJECTED -> {
+                String subject = "Your NGO registration was rejected";
+                String body = """
                   <div style="font-family:Segoe UI,Roboto,sans-serif;max-width:560px;margin:auto">
                     <h2 style="color:#dc2626">Registration rejected</h2>
                     <p>Hi %s,</p>
@@ -92,7 +115,54 @@ public class EmailService {
                     <p><b>Reason:</b> %s</p>
                   </div>
                   """.formatted(ngo.getName(), reason == null ? "Not specified" : reason);
-        send(ngo.getEmail(), subject, body);
+                send(ngo.getEmail(), subject, body);
+            }
+        }
+    }
+
+    public enum ApprovalOutcome {
+        APPROVED, PENDING, REJECTED
+    }
+
+    @Async("taskExecutor")
+    public void sendVolunteerPendingReview(Volunteer volunteer, String loginUrl) {
+        String body = """
+                <div style="font-family:Segoe UI,Roboto,sans-serif;max-width:560px;margin:auto">
+                  <h2 style="color:#0ea5e9">Registration received</h2>
+                  <p>Hi <b>%s</b>,</p>
+                  <p>Thank you for registering as a Nexora volunteer. Your application is now awaiting review by the Nexora Super Admin.</p>
+                  <p>You will receive another email as soon as your account is approved. Most reviews are completed within one business day.</p>
+                  <p>After approval, you can sign in at <a href="%s">%s</a> and start receiving invitations from NGOs in your area.</p>
+                </div>
+                """.formatted(volunteer.getName(), loginUrl, loginUrl);
+        send(volunteer.getEmail(), "Your volunteer registration is pending review", body);
+    }
+
+    @Async("taskExecutor")
+    public void sendVolunteerApproved(Volunteer volunteer, String loginUrl) {
+        String body = """
+                <div style="font-family:Segoe UI,Roboto,sans-serif;max-width:560px;margin:auto">
+                  <h2 style="color:#16a34a">You're approved!</h2>
+                  <p>Hi <b>%s</b>,</p>
+                  <p>Your Nexora volunteer account has been approved by the Super Admin. You can now sign in and accept invitations from NGOs in your area.</p>
+                  <p><a href="%s" style="background:#0ea5e9;color:white;padding:10px 16px;border-radius:8px;text-decoration:none">Login now</a></p>
+                </div>
+                """.formatted(volunteer.getName(), loginUrl);
+        send(volunteer.getEmail(), "Your volunteer account has been approved", body);
+    }
+
+    @Async("taskExecutor")
+    public void sendVolunteerRejected(Volunteer volunteer, String reason) {
+        String body = """
+                <div style="font-family:Segoe UI,Roboto,sans-serif;max-width:560px;margin:auto">
+                  <h2 style="color:#dc2626">Application rejected</h2>
+                  <p>Hi <b>%s</b>,</p>
+                  <p>Unfortunately your volunteer application was rejected.</p>
+                  <p><b>Reason:</b> %s</p>
+                  <p>If you believe this was a mistake, please reply to this email.</p>
+                </div>
+                """.formatted(volunteer.getName(), reason == null ? "Not specified" : reason);
+        send(volunteer.getEmail(), "Your volunteer application was rejected", body);
     }
 
     @Async("taskExecutor")

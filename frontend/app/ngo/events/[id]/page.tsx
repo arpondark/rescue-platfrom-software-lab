@@ -1,28 +1,30 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Users, Send, CheckCircle2, XCircle, MapPin } from "lucide-react";
 import { api } from "@/lib/api";
-import { useDistricts, useDivisions, useThanas } from "@/lib/locations";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { EventStatusBadge, SeverityBadge, EventTypeBadge, InvitationStatusBadge } from "@/components/ui/badge";
+import { PageHeader, StatCard, EmptyState, SectionTitle } from "@/components/ui/page";
+import { LocationCascade } from "@/components/ui/location-cascade";
+import { toast } from "@/components/ui/toast";
+import { formatDateTime } from "@/lib/utils";
 import type {
   DisasterEventResponse, InvitationResponse, VolunteerResponse,
 } from "@/lib/types";
 
 export default function EventManagePage() {
   const params = useParams<{ id: string }>();
-  const id = +params.id;
+  const router = useRouter();
+  const id = Number(params.id);
+
   const [event, setEvent] = useState<DisasterEventResponse | null>(null);
-  const [invitations, setInvitations] = useState<InvitationResponse[] | null>(null);
+  const [invitations, setInvitations] = useState<InvitationResponse[]>([]);
   const [candidates, setCandidates] = useState<VolunteerResponse[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  const divisions = useDivisions();
-  const [filterDivisionId, setFilterDivisionId] = useState<number | null>(null);
-  const districts = useDistricts(filterDivisionId);
-  const [filterDistrictId, setFilterDistrictId] = useState<number | null>(null);
-  const thanas = useThanas(filterDistrictId);
-  const [filterThanaId, setFilterThanaId] = useState<number | null>(null);
+  const [filterLocation, setFilterLocation] = useState<{ divisionId?: number; districtId?: number; thanaId?: number }>({});
   const [filterSkill, setFilterSkill] = useState("");
 
   async function load() {
@@ -42,85 +44,187 @@ export default function EventManagePage() {
   useEffect(() => { loadRecommended().catch(() => {}); }, [id, filterSkill]);
 
   async function invite() {
-    setBusy(true); setMsg(null);
+    setBusy(true);
     try {
       const r = await api<{ invited: number; skipped: number }>(`/api/v1/events/${id}/invitations`, {
         method: "POST", body: JSON.stringify({ volunteerIds: Array.from(selected) }),
       });
-      setMsg(`Invited: ${r.invited}, skipped: ${r.skipped}`);
+      toast("success", "Invitations sent", `${r.invited} invited, ${r.skipped} skipped (already invited).`);
       setSelected(new Set());
       await load();
-    } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+    } catch (e: any) {
+      toast("error", "Could not send", e.message);
+    } finally {
+      setBusy(false);
+    }
   }
 
-  if (!event) return <p>Loading...</p>;
+  if (!event) return <p className="text-sm text-mist">Loading…</p>;
+
+  const filtered = filterLocation.divisionId || filterLocation.districtId || filterLocation.thanaId
+    ? candidates.filter((v) =>
+        (!filterLocation.divisionId || v.division?.id === filterLocation.divisionId) &&
+        (!filterLocation.districtId || v.district?.id === filterLocation.districtId) &&
+        (!filterLocation.thanaId    || v.thana?.id    === filterLocation.thanaId)
+      )
+    : candidates;
+
+  const progress = Math.min(100, Math.round((event.acceptedCount / Math.max(1, event.requiredVolunteers)) * 100));
 
   return (
-    <div className="space-y-6">
-      <div className="card">
-        <h2 className="text-xl font-semibold">{event.title}</h2>
-        <p className="text-sm text-slate-500">{event.type} · {event.severity} · {event.status}</p>
-        <p className="text-sm">Starts: {new Date(event.startAt).toLocaleString()} | Ends: {new Date(event.endAt).toLocaleString()}</p>
-        <p>Areas: {event.divisions.map(d => d.name).join(", ")}</p>
-        {event.description && <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">{event.description}</p>}
+    <div>
+      <button onClick={() => router.push("/ngo/events")} className="text-sm text-mist hover:text-ink flex items-center gap-1 mb-4">
+        <ArrowLeft className="h-3 w-3" /> All events
+      </button>
+
+      <PageHeader
+        eyebrow={`Event #${event.id}`}
+        title={event.title}
+        description={
+          <span className="flex items-center gap-2 flex-wrap">
+            <EventTypeBadge type={event.type} />
+            <SeverityBadge severity={event.severity} />
+            <EventStatusBadge status={event.status} />
+            <span className="text-xs text-mist font-mono">
+              {formatDateTime(event.startAt)} → {formatDateTime(event.endAt)}
+            </span>
+          </span>
+        }
+      />
+
+      {event.description && (
+        <p className="max-w-3xl text-sm text-ink-400 mb-8">{event.description}</p>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        <StatCard label="Accepted"     value={event.acceptedCount} />
+        <StatCard label="Invited"      value={event.invitedCount} />
+        <StatCard label="Declined"     value={event.declinedCount} />
+        <StatCard label="Deployed"     value={event.deployedCount} />
       </div>
 
-      <div className="card">
-        <h3 className="font-semibold">Invitations ({invitations?.length ?? 0})</h3>
-        <table className="table mt-2">
-          <thead><tr><th>Volunteer</th><th>Status</th><th>Responded</th></tr></thead>
-          <tbody>
-            {invitations?.map((i) => (
-              <tr key={i.id}>
-                <td>{i.volunteerName}</td>
-                <td>{i.status}</td>
-                <td className="text-xs">{i.respondedAt ? new Date(i.respondedAt).toLocaleString() : "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="card">
-        <h3 className="font-semibold">Invite Volunteers</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 my-3">
-          <select className="input" value={filterDivisionId ?? ""} onChange={(e) => { setFilterDivisionId(e.target.value ? +e.target.value : null); setFilterDistrictId(null); setFilterThanaId(null); }}>
-            <option value="">Any division</option>
-            {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          <select className="input" disabled={!filterDivisionId} value={filterDistrictId ?? ""} onChange={(e) => { setFilterDistrictId(e.target.value ? +e.target.value : null); setFilterThanaId(null); }}>
-            <option value="">Any district</option>
-            {districts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          <select className="input" disabled={!filterDistrictId} value={filterThanaId ?? ""} onChange={(e) => setFilterThanaId(e.target.value ? +e.target.value : null)}>
-            <option value="">Any thana</option>
-            {thanas.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-          <input className="input" placeholder="Skill filter (optional)" value={filterSkill} onChange={(e) => setFilterSkill(e.target.value)} />
+      {/* Progress bar */}
+      <div className="nx-card-flat mb-10">
+        <div className="flex items-center justify-between mb-2">
+          <span className="eyebrow">Roster progress</span>
+          <span className="font-mono text-sm text-ink">
+            {event.acceptedCount}/{event.requiredVolunteers} ({progress}%)
+          </span>
         </div>
+        <div className="h-1 bg-paper-200 rounded overflow-hidden">
+          <div className="h-full bg-signal transition-all" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
 
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead><tr><th></th><th>Name</th><th>Email</th><th>Area</th><th>Skills</th></tr></thead>
+      {/* Invitations list */}
+      <SectionTitle eyebrow="Invitations" title={`${invitations.length} sent`} />
+      {invitations.length === 0 ? (
+        <EmptyState
+          icon={<Send className="h-6 w-6 mx-auto" />}
+          title="No invitations yet."
+          description="Send invitations to recommended volunteers to start the deployment."
+        />
+      ) : (
+        <div className="border border-ink-300 rounded bg-surface overflow-hidden mb-10">
+          <table className="nx-table">
+            <thead>
+              <tr>
+                <th>Volunteer</th>
+                <th>Status</th>
+                <th>Invited</th>
+                <th>Responded</th>
+              </tr>
+            </thead>
             <tbody>
-              {candidates.map((v) => (
-                <tr key={v.id}>
-                  <td><input type="checkbox" checked={selected.has(v.id)}
-                             onChange={(e) => { const ns = new Set(selected); e.target.checked ? ns.add(v.id) : ns.delete(v.id); setSelected(ns); }} /></td>
-                  <td>{v.name}</td>
-                  <td>{v.email}</td>
-                  <td className="text-xs">{[v.thana?.name, v.district?.name, v.division?.name].filter(Boolean).join(", ")}</td>
-                  <td className="text-xs">{v.skills.join(", ")}</td>
+              {invitations.map((i) => (
+                <tr key={i.id}>
+                  <td className="font-medium text-ink">{i.volunteerName}</td>
+                  <td><InvitationStatusBadge status={i.status} /></td>
+                  <td className="text-xs font-mono text-mist">{i.invitedAt ? new Date(i.invitedAt).toLocaleString() : "—"}</td>
+                  <td className="text-xs font-mono text-mist">{i.respondedAt ? new Date(i.respondedAt).toLocaleString() : "—"}</td>
                 </tr>
               ))}
-              {candidates.length === 0 && <tr><td colSpan={5} className="text-center text-sm py-3 text-slate-500">No volunteers found in affected areas</td></tr>}
             </tbody>
           </table>
         </div>
-        <button onClick={invite} disabled={busy || selected.size === 0} className="btn-primary mt-3">
-          {busy ? "Sending..." : `Send ${selected.size} invitation(s)`}
-        </button>
-        {msg && <p className="mt-2 text-sm text-slate-600">{msg}</p>}
+      )}
+
+      {/* Candidates */}
+      <div className="nx-card space-y-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <SectionTitle eyebrow="Send invitations" title="Recommended volunteers" />
+            <p className="text-sm text-mist -mt-3">
+              People in or near the affected areas. Filter further if you need to.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-mist">{selected.size} selected</span>
+            <Button onClick={invite} disabled={busy || selected.size === 0}>
+              <Send className="h-4 w-4" />
+              {busy ? "Sending…" : `Send ${selected.size || ""} invitation${selected.size === 1 ? "" : "s"}`}
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          <Input
+            placeholder="Filter by skill (e.g. first-aid)"
+            value={filterSkill}
+            onChange={(e) => setFilterSkill(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && loadRecommended()}
+          />
+          <div className="md:col-span-3">
+            <LocationCascade value={filterLocation} onChange={setFilterLocation} />
+          </div>
+        </div>
+
+        <div className="border border-ink-300 rounded bg-surface overflow-hidden">
+          <table className="nx-table">
+            <thead>
+              <tr>
+                <th className="w-8"></th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Area</th>
+                <th>Skills</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((v) => (
+                <tr key={v.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-sm"
+                      checked={selected.has(v.id)}
+                      onChange={(e) => {
+                        const ns = new Set(selected);
+                        if (e.target.checked) ns.add(v.id); else ns.delete(v.id);
+                        setSelected(ns);
+                      }}
+                    />
+                  </td>
+                  <td className="font-medium text-ink">{v.name}</td>
+                  <td className="text-xs">{v.email}</td>
+                  <td className="text-xs">
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="h-3 w-3 text-mist" />
+                      {[v.thana?.name, v.district?.name, v.division?.name].filter(Boolean).join(", ")}
+                    </span>
+                  </td>
+                  <td className="text-xs">
+                    {v.skills.length ? v.skills.map((s) => <span key={s} className="nx-badge nx-badge-ink mr-1">{s}</span>) : <span className="text-mist">—</span>}
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={5} className="text-center text-sm py-6 text-mist">No volunteers match this filter.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
